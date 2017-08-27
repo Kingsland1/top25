@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 # writer = pd.ExcelWriter('test.xlsx')
 
 
-data = pd.DataFrame.from_csv("..\\SpearmanRank\\ZZ500.csv")
+data = pd.DataFrame.from_csv("..\\top25\\ZZ500.csv")
 columns=list(data.columns)[::7]
 data_open=data.iloc[1:,::7].astype(float)
 data_high=data.iloc[1:,1::7].astype(float)
@@ -45,7 +45,7 @@ top25=pd.DataFrame.from_dict(temp_top25,orient='index')
 # 找到top25股票名字 所对应的日内intra  day  回报
 temp_top25_return_intraday={}
 for i,date in enumerate(return_close.index):
-    temp_top25_return_intraday[date]=return_open.loc[date+1, top25.iloc[i-1,:]]# 尝试隔夜持仓？？？这里需要修改一下
+    temp_top25_return_intraday[date]=return_open.loc[date, top25.iloc[i-1,:]]# 尝试隔夜持仓？？？这里需要修改一下
 top25_return_intraday=pd.DataFrame.from_dict(temp_top25_return_intraday, orient='index')
 # 把回报matrix row_wise 求平均，再累加起来
 top25_return_intraday_avg_cumsum=pd.DataFrame(top25_return_intraday.mean(axis=1)).cumsum()
