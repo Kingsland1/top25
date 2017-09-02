@@ -35,13 +35,16 @@ return_intraday=(data_close-data_open)/data_open
 
 # 找到top25的股票的名字
 top25=pd.DataFrame(index=data_open.index,columns=range(25))
-for date in return_close.index:
-    top25.loc[date]=pd.Series(return_close.loc[date]).sort_values(ascending=False).index[:25]
+# 第一天没有收益
+for i,date in enumerate(return_close.index[:-2]):
+    top25.iloc[i+2]=pd.Series(return_close.iloc[i+1]).sort_values(ascending=False).index[:25]
+    #top25.loc[date]=pd.Series(return_close.loc[date]).sort_values(ascending=False).index[:25]
 
 # 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
 top25_return_holding=pd.DataFrame(index=data_open.index,columns=columns )
-for i,date in enumerate(return_open.index[:-1]):
-     top25_return_holding.loc[date]=return_open.loc[return_open.index[i + 1], top25.iloc[i - 1, :]]
+# 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
+for i,date in enumerate(return_open.index[2:-10]):
+    top25_return_holding.loc[date]=return_open.loc[return_open.index[1:][i + 1], top25.loc[date]]
 # 把回报matrix row_wise 求平均，再累加起来
 top25_return_holding_avg=pd.DataFrame(top25_return_holding.mean(axis=1))
 top25_return_holding_avg_cumsum=pd.DataFrame(top25_return_holding_avg+1).cumprod()
