@@ -2,7 +2,7 @@
 #每天，对收益进行从高到低排序，找到Top25的股票，作为第二天的持仓，等权---就会产生一个每日仓位的 Dataframe
 #算出所有股票，每日的close/open-1 作为收益指标
 # 用T天算出的Top25的股票，作为T+1的持仓，其T+1的收益 为策略当天的收益，等权（暂时忽略了股票不能进行T0交易的限制）
-# 每天收益的cumsum为总收益（乘法，或者sum log），画出走势图，画出每日收益分布图
+# 每天收益的+1,再算cumprod为总收益，画出走势图，画出每日收益分布图
 
 
 #to do list
@@ -42,19 +42,17 @@ for i,date in enumerate(return_close.index):
     sorted_row_name=sorted_row_value.index[:25]
     temp_top25[date]=sorted_row_name
 top25=pd.DataFrame.from_dict(temp_top25,orient='index')
-# 找到top25股票名字 所对应的日内intra  day  回报
-temp_top25_return_intraday={}
-for i,date in enumerate(return_close.index):
-    temp_top25_return_intraday[date]=return_open.loc[date, top25.iloc[i-1,:]]# 尝试隔夜持仓？？？这里需要修改一下
-top25_return_intraday=pd.DataFrame.from_dict(temp_top25_return_intraday, orient='index')
+# 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
+temp_top25_return_holding={}
+for i,date in enumerate(return_close.index[:-1]):
+    temp_top25_return_holding[date]=return_open.loc[return_open.index[i + 1], top25.iloc[i - 1, :]]# T0股票的收益，现实在return_open的T+1
+
+top25_return_holding=pd.DataFrame.from_dict(temp_top25_return_holding, orient='index')
 # 把回报matrix row_wise 求平均，再累加起来
-top25_return_intraday_avg_cumsum=pd.DataFrame(top25_return_intraday.mean(axis=1)).cumsum()
-top25_return_intraday_avg_cumsum.plot()
+top25_return_holding_avg=pd.DataFrame(top25_return_holding.mean(axis=1))
+top25_return_holding_avg_cumsum=pd.DataFrame(top25_return_holding_avg+1).cumprod()
+
+top25_return_holding_avg_cumsum.plot()
 plt.figure()
-top25_return_intraday.mean(axis=1).plot()
+top25_return_holding.mean(axis=1).plot.hist(bins=100)
 plt.show()
-x=top25_return_intraday.mean(axis=1)
-x=pd.DataFrame(x)
-x.plot.bar()
-plt.bar
-x.plot.hist(bins=100)
