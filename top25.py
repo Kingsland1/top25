@@ -1,55 +1,56 @@
-#算出中证500股票的每日收益   (close/open)-1
-#每天，对收益进行从高到低排序，找到Top25的股票，作为第二天的持仓，等权---就会产生一个每日仓位的 Dataframe
-#算出所有股票，每日的close/open-1 作为收益指标
-# 用T天算出的Top25的股票，作为T+1的持仓，其T+1的收益 为策略当天的收益，等权（暂时忽略了股票不能进行T0交易的限制）
-# 每天收益的+1,再算cumprod为总收益，画出走势图，画出每日收益分布图
-
-
-#to do list
-#
-
-
-
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+########################################################################
+# 
+# Copyright (c) 2017 Kingsland1.com, Inc. All Rights Reserved
+# 
+########################################################################
+ 
+"""
+File: top25.py
+Author: Kingsland1(fantine16@163.com)
+Date: 2017/09/03 14:06:46
+"""
+import sys
 import pandas as pd
-# import rolling_beta
 import matplotlib.pyplot as plt
 
-# writer = pd.ExcelWriter('test.xlsx')
+
+def main(stock_num=25):
+    """
+    打板策略
+    """
+    data = pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, header=1)
+    stock_columns = list(pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, nrows=1).columns)[::7]
+    date_index = data.index
+    data_open = data.iloc[:, ::7].astype(float)
+    data_close = data.iloc[:, 3::7].astype(float)
+    data_open.columns = stock_columns
+    data_close.columns = stock_columns
+    return_open = data_open.pct_change()
+    return_close = data_close.pct_change()
+    # 得到每天的选股，25个股票，第一天和第二天的闭盘收益比，得到第三天的选股
+    top_stocks = pd.DataFrame(index=date_index, columns=range(stock_num))
+    for i, date in enumerate(date_index[:-2]):
+        top_stocks.iloc[i+2] = pd.Series(return_close.iloc[i+1]).sort_values(ascending=False).index[:stock_num]
+    # 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
+    return_holding = pd.DataFrame(index=date_index, columns=range(stock_num))
+    for i, date in enumerate(date_index[2:-1]):
+        return_holding.loc[date] = pd.Series(return_open.loc[date_index[2:][i + 1], top_stocks.loc[date]].values)
+    # 把回报matrix row_wise 求平均，再计算累计积
+    avg = return_holding.mean(axis=1)
+    cumsum = (avg + 1).cumprod()
+    cumsum.plot()
+    plt.figure()
+    return_holding.mean(axis=1).plot.hist(bins=100)
+    plt.show()
 
 
-data = pd.DataFrame.from_csv("ZZ500.csv")
-columns=list(data.columns)[::7]
-data_open=data.iloc[1:,::7].astype(float)
-data_high=data.iloc[1:,1::7].astype(float)
-data_low=data.iloc[1:,2::7].astype(float)
-data_close=data.iloc[1:,3::7].astype(float)
-data_volume=data.iloc[1:,4::7].astype(float)
-data_open.columns = columns
-data_high.columns=columns
-data_low.columns=columns
-data_close.columns=columns
-data_volume.columns=columns
-return_close=data_close.pct_change()
-return_open=data_open.pct_change()
-return_intraday=(data_close-data_open)/data_open
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        main(25)
+    elif len(sys.argv) == 2:
+        main(int(sys.argv[1]))
+    else:
+        print("args error", file=sys.stderr)
 
-# 找到top25的股票的名字
-top25=pd.DataFrame(index=data_open.index,columns=range(25))
-# 第一天没有收益
-for i,date in enumerate(return_close.index[:-2]):
-    top25.iloc[i+2]=pd.Series(return_close.iloc[i+1]).sort_values(ascending=False).index[:25]
-    #top25.loc[date]=pd.Series(return_close.loc[date]).sort_values(ascending=False).index[:25]
-
-# 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
-top25_return_holding=pd.DataFrame(index=data_open.index,columns=columns )
-# 找到top25股票名字 所对应的隔日回报，比如今天开盘买进，明天开盘卖出
-for i,date in enumerate(return_open.index[2:-10]):
-    top25_return_holding.loc[date]=return_open.loc[return_open.index[1:][i + 1], top25.loc[date]]
-# 把回报matrix row_wise 求平均，再累加起来
-top25_return_holding_avg=pd.DataFrame(top25_return_holding.mean(axis=1))
-top25_return_holding_avg_cumsum=pd.DataFrame(top25_return_holding_avg+1).cumprod()
-
-top25_return_holding_avg_cumsum.plot()
-plt.figure()
-top25_return_holding.mean(axis=1).plot.hist(bins=100)
-plt.show()
