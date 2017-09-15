@@ -26,8 +26,7 @@ def main(args):
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
     data_close.columns = stock_columns
-    top_stocks = get_stocks(data_close, args)
-    return_holding = get_return_holding(data_open, top_stocks, args)
+    return_holding = strategy(data_close, data_open, args)
     # 把回报matrix row_wise 求平均，再计算累计积
     avg = return_holding.mean(axis=1)
     cumsum = (avg + 1).cumprod()
@@ -35,6 +34,15 @@ def main(args):
     plt.figure()
     return_holding.mean(axis=1).plot.hist(bins=100)
     plt.show()
+
+
+def strategy(data_close, data_open, args):
+    """
+    根据一组参数args，得到的收益
+    """
+    top_stocks = get_stocks(data_close, args)
+    return_holding = get_return_holding(data_open, top_stocks, args)
+    return return_holding
 
 
 def get_stocks(data_close, args):
@@ -65,7 +73,6 @@ def get_return_holding(data_open, top_stocks, args):
         date1 = date_index[i]
         date2 = date_index[i + hold_days]
         return_holding.loc[date2] = pd.Series(return_open.loc[date2, top_stocks.loc[date1]].values)
-
     return return_holding
 
 if __name__ == "__main__":
