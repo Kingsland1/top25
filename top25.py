@@ -26,13 +26,13 @@ def main(args):
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
     data_close.columns = stock_columns
-    return_holding = strategy(data_close, data_open, args)
     # 把回报matrix row_wise 求平均，再计算累计积
-    avg = return_holding.mean(axis=1)
-    cumsum = (avg + 1).cumprod()
-    cumsum.plot()
-    plt.figure()
-    return_holding.mean(axis=1).plot.hist(bins=100)
+    for i in range(10, 30, 2):
+        args.stock_num = i
+        cumsum = strategy(data_close, data_open, args)
+        cumsum.plot()
+    #plt.figure()
+    #return_holding.mean(axis=1).plot.hist(bins=100)
     plt.show()
 
 
@@ -42,7 +42,9 @@ def strategy(data_close, data_open, args):
     """
     top_stocks = get_stocks(data_close, args)
     return_holding = get_return_holding(data_open, top_stocks, args)
-    return return_holding
+    avg = return_holding.mean(axis=1)
+    cumsum = (avg + 1).cumprod()
+    return cumsum
 
 
 def get_stocks(data_close, args):
