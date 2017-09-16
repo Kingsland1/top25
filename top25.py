@@ -26,14 +26,55 @@ def main(args):
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
     data_close.columns = stock_columns
-    # 把回报matrix row_wise 求平均，再计算累计积
-    for i in range(10, 30, 2):
+    df1 = watch_stock(data_close, data_open, args)
+    df2 = watch_hold_days(data_close, data_open, args)
+    df3 = watch_pick_window(data_close, data_open, args)
+    df1.plot()
+    df2.plot()
+    df3.plot()
+    plt.show()
+
+
+def watch_stock(data_close, data_open, args, stock_range=range(15, 30, 3)):
+    """
+    固定hold_days和pick_window，观察stock_num
+    """
+    date_index = data_open.index
+    stock_range1 = ['stock_num=' + str(i) for i in stock_range]
+    df = pd.DataFrame(index=date_index, columns=stock_range1)
+    for i in stock_range:
         args.stock_num = i
         cumsum = strategy(data_close, data_open, args)
-        cumsum.plot()
-    #plt.figure()
-    #return_holding.mean(axis=1).plot.hist(bins=100)
-    plt.show()
+        df['stock_num=' + str(i)] = cumsum
+    return df
+
+
+def watch_hold_days(data_close, data_open, args, hold_range=range(1, 4)):
+    """
+    固定stock_num和pick_window，观察hold_days
+    """
+    date_index = data_open.index
+    hold_range1 = ['hold_days=' + str(i) for i in hold_range]
+    df = pd.DataFrame(index=date_index, columns=hold_range1)
+    for i in hold_range:
+        args.hold_days = i
+        cumsum = strategy(data_close, data_open, args)
+        df['hold_days=' + str(i)] = cumsum
+    return df
+
+
+def watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
+    """
+    固定hold_days和stock_num，观察pick_window
+    """
+    date_index = data_open.index
+    pick_range1 = ['pick_window=' + str(i) for i in pick_range]
+    df = pd.DataFrame(index=date_index, columns=pick_range1)
+    for i in pick_range:
+        args.pick_window = i
+        cumsum = strategy(data_close, data_open, args)
+        df['pick_window=' + str(i)] = cumsum
+    return df
 
 
 def strategy(data_close, data_open, args):
