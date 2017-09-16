@@ -29,10 +29,9 @@ def main(args):
     df1 = watch_stock(data_close, data_open, args)
     df2 = watch_hold_days(data_close, data_open, args)
     df3 = watch_pick_window(data_close, data_open, args)
-    df1.plot()
-    df2.plot()
-    df3.plot()
-    plt.show()
+    df1.plot().get_figure().savefig('df1.png')
+    df2.plot().get_figure().savefig('df2.png')
+    df3.plot().get_figure().savefig('df3.png')
 
 
 def watch_stock(data_close, data_open, args, stock_range=range(15, 30, 3)):
