@@ -14,6 +14,7 @@ Date: 2017/09/03 14:06:46
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
+import copy
 
 
 
@@ -43,7 +44,7 @@ def watch_stock(data_close, data_open, args, stock_range=range(15, 50, 3)):
     date_index = data_open.index
     stock_range1 = ['stock_num=' + str(i) for i in stock_range]
     df = pd.DataFrame(index=date_index, columns=stock_range1)
-    temp_args = Temp_args(args)
+    temp_args = copy.copy(args)
     for i in stock_range:
         temp_args.stock_num = i
         cumsum = strategy(data_close, data_open, temp_args)
@@ -58,7 +59,7 @@ def watch_hold_days(data_close, data_open, args, hold_range=range(1, 5)):
     date_index = data_open.index
     hold_range1 = ['hold_days=' + str(i) for i in hold_range]
     df = pd.DataFrame(index=date_index, columns=hold_range1)
-    temp_args = Temp_args(args)
+    temp_args = copy.copy(args)
     for i in hold_range:
         temp_args.hold_days = i
         cumsum = strategy(data_close, data_open, temp_args)
@@ -73,7 +74,7 @@ def watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
     date_index = data_open.index
     pick_range1 = ['pick_window=' + str(i) for i in pick_range]
     df = pd.DataFrame(index=date_index, columns=pick_range1)
-    temp_args = Temp_args(args)
+    temp_args = copy.copy(args)
     for i in pick_range:
         temp_args.pick_window = i
         cumsum = strategy(data_close, data_open, temp_args)
@@ -134,11 +135,6 @@ if __name__ == "__main__":
     parser.add_argument('-sn', '--stock_num', type=int, default=15)
     parser.add_argument('-pw', '--pick_window', type=int, default=1)
     args = parser.parse_args()
-    class Temp_args:
-        def __init__(self,args):
-            self.hold_days = args.hold_days
-            self.stock_num = args.stock_num
-            self.pick_window = args.pick_window
     main(args)
 
 
