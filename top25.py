@@ -5,7 +5,7 @@
 # Copyright (c) 2017 Kingsland1.com, Inc. All Rights Reserved
 # 
 ########################################################################
- 
+
 """
 File: top25.py
 Author: Kingsland1(fantine16@163.com)
@@ -13,21 +13,27 @@ Date: 2017/09/03 14:06:46
 """
 import argparse
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+import itertools
 import copy
-
 
 
 def main(args):
     """
     打板策略
     """
+
     data = pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, header=1)
     stock_columns = list(pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, nrows=1).columns)[::7]
     data_open = data.iloc[:, ::7].astype(float)
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
     data_close.columns = stock_columns
+
+    a = new_strategy(data_close, data_open, args)
+    df = a.holding.nav.iloc[:, 2]
+    df.plot(title=args).get_figure().savefig('df.png')
     df1 = watch_stock(data_close, data_open, args)
     df2 = watch_hold_days(data_close, data_open, args)
     df3 = watch_pick_window(data_close, data_open, args)
@@ -37,7 +43,7 @@ def main(args):
     plt.plot()
 
 
-def watch_stock(data_close, data_open, args, stock_range=range(15, 50, 3)):
+def watch_stock(data_close, data_open, args, stock_range=range(1, 16, 3)):
     """
     固定hold_days和pick_window，观察stock_num
     """
@@ -52,7 +58,7 @@ def watch_stock(data_close, data_open, args, stock_range=range(15, 50, 3)):
     return df
 
 
-def watch_hold_days(data_close, data_open, args, hold_range=range(1, 5)):
+def watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
     """
     固定stock_num和pick_window，观察hold_days
     """
@@ -124,6 +130,164 @@ def get_return_holding(data_open, top_stocks, args):
     return return_holding
 
 
+class Portfolio:
+    def __init__(self, data_close):
+        self.trading = Trading(data_close)
+        self.holding = Holding(data_close)
+        self.current = Current()
+
+
+class Trading:
+    def __init__(self, data_close):
+        self.buy_name = pd.DataFrame(index=data_close.index)
+        self.sell_name = pd.DataFrame(index=data_close.index)
+        self.buy_price = pd.DataFrame(index=data_close.index)
+        self.sell_price = pd.DataFrame(index=data_close.index)
+        self.buy_amount = pd.DataFrame(index=data_close.index, columns=range(args.stock_num))
+        self.sell_amount = pd.DataFrame(index=data_close.index, columns=range(args.stock_num))
+
+
+class Holding:
+    def __init__(self, data_close):
+        self.cash = pd.DataFrame(index=data_close.index, columns=['open_cash', 'cash_in', 'cash_out', 'close_cash'])
+        self.current_holding = pd.DataFrame(index=data_close.index)
+        self.amount = pd.DataFrame(index=data_close.index)
+        self.price_table = pd.DataFrame()
+        self.cost_table = pd.DataFrame()
+        self.nav = pd.DataFrame(index=data_close.index, columns=['close_cash', 'stock_value', 'nav'])
+
+
+class Current:
+    def __init__(self):
+        """
+        holding is [[name],[],[amount]]
+        """
+        self.date = str()
+        self.cash = float()
+        self.holding = {}
+        self.market_value = float()
+
+
+def get_price_table(Dataframe, price_source):  # 给一个股票名字的df,返回这些股票的价格
+    price_table = pd.DataFrame(index=Dataframe.index,
+                               columns=range(Dataframe.shape[1]))
+    for i, date in enumerate(Dataframe.index):
+        for j, stock in enumerate(Dataframe.loc[date]):
+            if pd.notnull(stock) == 1:
+                price_table.iloc[i, j] = price_source.loc[date, stock]
+    return price_table
+
+
+def get_buy_amount(budget, trading_list):  # 通过交易清单，计算出买卖的股票的数量
+    """
+    trading list is a [[name],[price],[amount]]
+    """
+    budget_per_stock = budget / len(trading_list[1])
+    trading_list[2] = [0] * len(trading_list[0])
+
+    for i, stock in enumerate(trading_list[0]):
+        if pd.notnull(stock) == 1:
+            trading_list[2][i] = budget_per_stock / trading_list[1][i]
+    return trading_list[2]
+
+
+def get_current_holding(Portfolio, args):
+    current_holding_table = pd.DataFrame(index=Portfolio.trading.buy_name.index,
+                                         columns=range(args.hold_days * Portfolio.trading.buy_name.shape[1]))
+    for i, date in enumerate(Portfolio.trading.buy_name.index):
+        stock_block = np.array(Portfolio.trading.buy_name.iloc[max(i + 1 - args.hold_days, 0):i + 1, :]).tolist()
+        current_holding_table1 = list(itertools.chain.from_iterable(stock_block))
+        for j, stock in enumerate(current_holding_table1):
+            current_holding_table.iloc[i, j] = stock
+    return current_holding_table
+
+
+def get_holding_amount(Portfolio, args):
+    amount_table = pd.DataFrame(index=Portfolio.trading.buy_name.index,
+                                columns=range(args.hold_days * Portfolio.trading.buy_name.shape[1]))
+    for i, date in enumerate(Portfolio.trading.buy_amount.index):
+        amount_block = np.array(Portfolio.trading.buy_amount.iloc[max(i + 1 - args.hold_days, 0):i + 1, :]).tolist()
+        amount_table1 = list(itertools.chain.from_iterable(amount_block))
+        for j, stock in enumerate(amount_table1):
+            amount_table.iloc[i, j] = stock
+    return amount_table
+
+
+def get_holding_nav(Portfolio, args):
+    nav_table = pd.DataFrame(index=Portfolio.holding.cash.index, columns=['close_cash', 'stock_value', 'nav'])
+    for i, date in enumerate(Portfolio.trading.buy_amount.index):
+        nav_table.iloc[i, 0] = Portfolio.holding.cash.iloc[i, 3]
+        nav_table.iloc[i, 1] = np.nansum(Portfolio.holding.amount.iloc[i] * Portfolio.holding.price_table.iloc[i])
+    nav_table.iloc[:, 2] = nav_table.iloc[:, 0] + nav_table.iloc[:, 1]
+
+    return nav_table
+
+
+def trade_portfolio(Portfolio, args):
+    Portfolio.current.cash = float(args.asset)
+
+    for i, date in enumerate(Portfolio.trading.buy_name.index):
+
+        """    
+        trading list is a [[name],[price],[amount]]     
+        """
+        """
+        卖股票
+        只写了卖掉全部股票的程序，还可以扩展成没有完全卖空的情况
+        """
+        sell_list = [[], [], []]
+        sell_list[0] = Portfolio.trading.sell_name.iloc[i, :].values
+        sell_list[1] = Portfolio.trading.sell_price.iloc[i, :].values
+        sell_list[2] = Portfolio.trading.buy_amount.iloc[i - args.hold_days, :]
+        cash_in = np.nansum(sell_list[1] * sell_list[2])
+        if np.isnan(cash_in) == 1:
+            pass
+        else:
+
+            """cash open"""
+            Portfolio.holding.cash.iloc[i, 0] = Portfolio.current.cash
+            Portfolio.holding.cash.iloc[i, 1] = cash_in
+            Portfolio.current.cash = Portfolio.current.cash + cash_in
+
+        """
+        买股票
+        """
+        buy_list = [[], [], []]
+        buy_list[0] = Portfolio.trading.buy_name.iloc[i, :].values
+        buy_list[1] = Portfolio.trading.buy_price.iloc[i, :].values
+        buy_list[2] = get_buy_amount(budget=min(Portfolio.current.cash, args.asset / args.hold_days),
+                                     trading_list=buy_list)
+        cash_out = np.nansum(buy_list[1] * buy_list[2])
+        if np.isnan(cash_out) == 1:
+            pass
+        else:
+            Portfolio.holding.cash.iloc[i, 2] = cash_out
+            Portfolio.current.cash = Portfolio.current.cash - cash_out
+            """cash close"""
+            Portfolio.holding.cash.iloc[i, 3] = Portfolio.current.cash
+
+        """
+        记录交易结果
+        """
+        Portfolio.trading.buy_amount.iloc[i, :] = buy_list[2]
+        Portfolio.trading.sell_amount.iloc[i, :] = sell_list[2]
+
+    return Portfolio
+
+
+def new_strategy(data_close, data_open, args):
+    a = Portfolio(data_close)
+    a.trading.buy_name = get_stocks(data_close, args)
+    a.trading.sell_name = a.trading.buy_name.shift(args.hold_days)
+    a.trading.buy_price = get_price_table(a.trading.buy_name, data_open)
+    a.trading.sell_price = get_price_table(a.trading.sell_name, data_open)
+    a = trade_portfolio(a, args)
+    a.holding.current_holding = get_current_holding(a, args)
+    a.holding.amount = get_holding_amount(a, args)
+    a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
+    a.holding.price_table = get_price_table(a.holding.current_holding, data_close)
+    a.holding.nav = get_holding_nav(a, args)
+    return a
 
 
 if __name__ == "__main__":
@@ -131,10 +295,9 @@ if __name__ == "__main__":
     程序入口
     """
     parser = argparse.ArgumentParser(description='打板策略')
-    parser.add_argument('-hd', '--hold_days', type=int, default=3)
+    parser.add_argument('-hd', '--hold_days', type=int, default=10)
     parser.add_argument('-sn', '--stock_num', type=int, default=15)
     parser.add_argument('-pw', '--pick_window', type=int, default=1)
+    parser.add_argument('-a', '--asset', type=int, default=10000000)
     args = parser.parse_args()
     main(args)
-
-
