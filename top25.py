@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import itertools
 import copy
 import timeit
+from pandas import ExcelWriter
 
 
 def main(args):
@@ -31,10 +32,9 @@ def main(args):
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
     data_close.columns = stock_columns
-
-    a = new_strategy(data_close, data_open, args)
-    df = a.holding.nav.iloc[:, 2]
-    df.plot(title=args).get_figure().savefig('df.png')
+    # a = new_strategy(data_close, data_open, args)
+    # df = a.holding.nav.iloc[:, 2]
+    # df.plot(title=args).get_figure().savefig('df.png')
     df1 = new_watch_stock(data_close, data_open, args)
     df2 = new_watch_hold_days(data_close, data_open, args)
     df3 = new_watch_pick_window(data_close, data_open, args)
@@ -48,7 +48,7 @@ def main(args):
     plt.plot()
 
 
-def new_watch_stock(data_close, data_open, args, stock_range=range(10, 31, 3)):
+def new_watch_stock(data_close, data_open, args, stock_range=range(5, 11, 1)):
     """
     固定hold_days和pick_window，观察stock_num
     """
@@ -183,9 +183,40 @@ def get_return_holding(data_open, top_stocks, args):
 
 class Portfolio:
     def __init__(self, data_close, args):
+        self.name = args
         self.trading = Trading(data_close, args)
         self.holding = Holding(data_close)
         self.current = Current()
+
+    def save(self):
+        writer = ExcelWriter('%s .xlsx' % self.name)
+        print_list = [self.trading.buy_name,
+                      self.trading.sell_name,
+                      self.trading.buy_price,
+                      self.trading.sell_price,
+                      self.trading.buy_amount,
+                      self.trading.sell_amount,
+                      self.holding.cash,
+                      self.holding.current_holding,
+                      self.holding.amount,
+                      self.holding.price_table,
+                      self.holding.cost_table,
+                      self.holding.nav]
+        name_list = ['self.trading.buy_name',
+                     'self.trading.sell_name',
+                     'self.trading.buy_price',
+                     'self.trading.sell_price',
+                     'self.trading.buy_amount',
+                     'self.trading.sell_amount',
+                     'self.holding.cash',
+                     'self.holding.current_holding',
+                     'self.holding.amount',
+                     'self.holding.price_table',
+                     'self.holding.cost_table',
+                     'self.holding.nav']
+        for i, df in enumerate(print_list):
+            df.to_excel(writer, '%s' % name_list[i])
+        writer.save()
 
 
 class Trading:
@@ -267,7 +298,7 @@ def get_holding_amount(Portfolio, args):
     return amount_table
 
 
-def get_holding_nav(Portfolio, args):
+def get_holding_nav(Portfolio):
     nav_table = pd.DataFrame(index=Portfolio.holding.cash.index, columns=['close_cash', 'stock_value', 'nav'])
     for i, date in enumerate(Portfolio.trading.buy_amount.index):
         nav_table.iloc[i, 0] = Portfolio.holding.cash.iloc[i, 3]
@@ -338,9 +369,10 @@ def new_strategy(data_close, data_open, args):
     a = trade_portfolio(a, args)
     a.holding.current_holding = get_current_holding(a, args)
     a.holding.amount = get_holding_amount(a, args)
-    # a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
+    a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
     a.holding.price_table = get_price_table(a.holding.current_holding, data_close)
-    a.holding.nav = get_holding_nav(a, args)
+    a.holding.nav = get_holding_nav(a)
+    a.save()
     return a
 
 
@@ -349,8 +381,8 @@ if __name__ == "__main__":
     程序入口
     """
     parser = argparse.ArgumentParser(description='打板策略')
-    parser.add_argument('-hd', '--hold_days', type=int, default=10)
-    parser.add_argument('-sn', '--stock_num', type=int, default=15)
+    parser.add_argument('-hd', '--hold_days', type=int, default=5)
+    parser.add_argument('-sn', '--stock_num', type=int, default=10)
     parser.add_argument('-pw', '--pick_window', type=int, default=1)
     parser.add_argument('-a', '--asset', type=int, default=10000000)
     args = parser.parse_args()
