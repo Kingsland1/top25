@@ -34,13 +34,29 @@ def main(args):
     a = new_strategy(data_close, data_open, args)
     df = a.holding.nav.iloc[:, 2]
     df.plot(title=args).get_figure().savefig('df.png')
-    df1 = watch_stock(data_close, data_open, args)
-    df2 = watch_hold_days(data_close, data_open, args)
-    df3 = watch_pick_window(data_close, data_open, args)
+    df1 = new_watch_stock(data_close, data_open, args)
+    # df2 = watch_hold_days(data_close, data_open, args)
+    # df3 = watch_pick_window(data_close, data_open, args)
     df1.plot(title=args).get_figure().savefig('df1.png')
-    df2.plot(title=args).get_figure().savefig('df2.png')
-    df3.plot(title=args).get_figure().savefig('df3.png')
+    # df2.plot(title=args).get_figure().savefig('df2.png')
+    # df3.plot(title=args).get_figure().savefig('df3.png')
     plt.plot()
+
+
+def new_watch_stock(data_close, data_open, args, stock_range=range(10, 16, 3)):
+    """
+    固定hold_days和pick_window，观察stock_num
+    """
+
+    date_index = data_open.index
+    stock_range1 = ['stock_num=' + str(i) for i in stock_range]
+    df = pd.DataFrame(index=date_index, columns=stock_range1)
+    temp_args = copy.copy(args)
+    for i in stock_range:
+        temp_args.stock_num = i
+        portfolio = new_strategy(data_close, data_open, temp_args)
+        df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
+    return df
 
 
 def watch_stock(data_close, data_open, args, stock_range=range(1, 16, 3)):
@@ -236,9 +252,9 @@ def trade_portfolio(Portfolio, args):
         只写了卖掉全部股票的程序，还可以扩展成没有完全卖空的情况
         """
         sell_list = [[], [], []]
-        sell_list[0] = Portfolio.trading.sell_name.iloc[i, :].values
-        sell_list[1] = Portfolio.trading.sell_price.iloc[i, :].values
-        sell_list[2] = Portfolio.trading.buy_amount.iloc[i - args.hold_days, :]
+        sell_list[0] = np.array(Portfolio.trading.sell_name.iloc[i, :].values)
+        sell_list[1] = np.array(Portfolio.trading.sell_price.iloc[i, :].values)
+        sell_list[2] = np.array(Portfolio.trading.buy_amount.iloc[i - args.hold_days, :])
         cash_in = np.nansum(sell_list[1] * sell_list[2])
         if np.isnan(cash_in) == 1:
             pass
