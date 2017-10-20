@@ -90,7 +90,7 @@ def new_watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5))
     for i in hold_range:
         temp_args.hold_days = i
         portfolio = new_strategy(data_close, data_open, temp_args)
-        df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
+        df['hold_days=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
 
@@ -120,7 +120,7 @@ def new_watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
     for i in pick_range:
         temp_args.pick_window = i
         portfolio = new_strategy(data_close, data_open, temp_args)
-        df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
+        df['pick_window=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
 
