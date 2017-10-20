@@ -17,6 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import copy
+import timeit
 
 
 def main(args):
@@ -35,15 +36,19 @@ def main(args):
     df = a.holding.nav.iloc[:, 2]
     df.plot(title=args).get_figure().savefig('df.png')
     df1 = new_watch_stock(data_close, data_open, args)
+    df2 = new_watch_hold_days(data_close, data_open, args)
+    df3 = new_watch_pick_window(data_close, data_open, args)
+    # df1 = watch_stock(data_close, data_open, args)
     # df2 = watch_hold_days(data_close, data_open, args)
     # df3 = watch_pick_window(data_close, data_open, args)
+
     df1.plot(title=args).get_figure().savefig('df1.png')
-    # df2.plot(title=args).get_figure().savefig('df2.png')
-    # df3.plot(title=args).get_figure().savefig('df3.png')
+    df2.plot(title=args).get_figure().savefig('df2.png')
+    df3.plot(title=args).get_figure().savefig('df3.png')
     plt.plot()
 
 
-def new_watch_stock(data_close, data_open, args, stock_range=range(10, 16, 3)):
+def new_watch_stock(data_close, data_open, args, stock_range=range(10, 31, 3)):
     """
     固定hold_days和pick_window，观察stock_num
     """
@@ -74,6 +79,21 @@ def watch_stock(data_close, data_open, args, stock_range=range(1, 16, 3)):
     return df
 
 
+def new_watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
+    """
+    固定stock_num和pick_window，观察hold_days
+    """
+    date_index = data_open.index
+    hold_range1 = ['hold_days=' + str(i) for i in hold_range]
+    df = pd.DataFrame(index=date_index, columns=hold_range1)
+    temp_args = copy.copy(args)
+    for i in hold_range:
+        temp_args.hold_days = i
+        portfolio = new_strategy(data_close, data_open, temp_args)
+        df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
+    return df
+
+
 def watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
     """
     固定stock_num和pick_window，观察hold_days
@@ -86,6 +106,21 @@ def watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
         temp_args.hold_days = i
         cumsum = strategy(data_close, data_open, temp_args)
         df['hold_days=' + str(i)] = cumsum
+    return df
+
+
+def new_watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
+    """
+    固定hold_days和stock_num，观察pick_window
+    """
+    date_index = data_open.index
+    pick_range1 = ['pick_window=' + str(i) for i in pick_range]
+    df = pd.DataFrame(index=date_index, columns=pick_range1)
+    temp_args = copy.copy(args)
+    for i in pick_range:
+        temp_args.pick_window = i
+        portfolio = new_strategy(data_close, data_open, temp_args)
+        df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
 
@@ -147,14 +182,14 @@ def get_return_holding(data_open, top_stocks, args):
 
 
 class Portfolio:
-    def __init__(self, data_close):
-        self.trading = Trading(data_close)
+    def __init__(self, data_close, args):
+        self.trading = Trading(data_close, args)
         self.holding = Holding(data_close)
         self.current = Current()
 
 
 class Trading:
-    def __init__(self, data_close):
+    def __init__(self, data_close, args):
         self.buy_name = pd.DataFrame(index=data_close.index)
         self.sell_name = pd.DataFrame(index=data_close.index)
         self.buy_price = pd.DataFrame(index=data_close.index)
@@ -211,10 +246,13 @@ def get_current_holding(Portfolio, args):
     current_holding_table = pd.DataFrame(index=Portfolio.trading.buy_name.index,
                                          columns=range(args.hold_days * Portfolio.trading.buy_name.shape[1]))
     for i, date in enumerate(Portfolio.trading.buy_name.index):
-        stock_block = np.array(Portfolio.trading.buy_name.iloc[max(i + 1 - args.hold_days, 0):i + 1, :]).tolist()
+
+        stock_block = Portfolio.trading.buy_name.iloc[max(i + 1 - args.hold_days, 0):i + 1, :].values.tolist()
         current_holding_table1 = list(itertools.chain.from_iterable(stock_block))
+        start_time = timeit.default_timer()
         for j, stock in enumerate(current_holding_table1):
             current_holding_table.iloc[i, j] = stock
+        print(timeit.default_timer() - start_time)
     return current_holding_table
 
 
@@ -292,7 +330,7 @@ def trade_portfolio(Portfolio, args):
 
 
 def new_strategy(data_close, data_open, args):
-    a = Portfolio(data_close)
+    a = Portfolio(data_close, args)
     a.trading.buy_name = get_stocks(data_close, args)
     a.trading.sell_name = a.trading.buy_name.shift(args.hold_days)
     a.trading.buy_price = get_price_table(a.trading.buy_name, data_open)
@@ -300,7 +338,7 @@ def new_strategy(data_close, data_open, args):
     a = trade_portfolio(a, args)
     a.holding.current_holding = get_current_holding(a, args)
     a.holding.amount = get_holding_amount(a, args)
-    a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
+    # a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
     a.holding.price_table = get_price_table(a.holding.current_holding, data_close)
     a.holding.nav = get_holding_nav(a, args)
     return a
