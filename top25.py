@@ -29,15 +29,19 @@ def main(args):
     data = pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, header=1)
     stock_columns = list(pd.read_csv(filepath_or_buffer="ZZ500.csv", index_col=0, nrows=1).columns)[::7]
     data_open = data.iloc[:, ::7].astype(float)
+    data_high = data.iloc[:, 1::7].astype(float)
+    data_low = data.iloc[:, 2::7].astype(float)
     data_close = data.iloc[:, 3::7].astype(float)
     data_open.columns = stock_columns
+    data_high.columns = stock_columns
+    data_low.columns = stock_columns
     data_close.columns = stock_columns
-    # a = new_strategy(data_close, data_open, args)
-    # df = a.holding.nav.iloc[:, 2]
-    # df.plot(title=args).get_figure().savefig('df.png')
-    df1 = new_watch_stock(data_close, data_open, args)
-    df2 = new_watch_hold_days(data_close, data_open, args)
-    df3 = new_watch_pick_window(data_close, data_open, args)
+    a = new_strategy(data_open, data_high, data_low, data_close, args)
+    df = a.holding.nav.iloc[:, 2]
+    df.plot(title=args).get_figure().savefig('df.png')
+    df1 = new_watch_stock(data_open, data_high, data_low, data_close, args)
+    df2 = new_watch_hold_days(data_open, data_high, data_low, data_close, args)
+    df3 = new_watch_pick_window(data_open, data_high, data_low, data_close, args)
     # df1 = watch_stock(data_close, data_open, args)
     # df2 = watch_hold_days(data_close, data_open, args)
     # df3 = watch_pick_window(data_close, data_open, args)
@@ -48,7 +52,7 @@ def main(args):
     plt.plot()
 
 
-def new_watch_stock(data_close, data_open, args, stock_range=range(5, 11, 1)):
+def new_watch_stock(data_open, data_high, data_low, data_close, args, stock_range=range(10, 41, 5)):
     """
     固定hold_days和pick_window，观察stock_num
     """
@@ -59,7 +63,7 @@ def new_watch_stock(data_close, data_open, args, stock_range=range(5, 11, 1)):
     temp_args = copy.copy(args)
     for i in stock_range:
         temp_args.stock_num = i
-        portfolio = new_strategy(data_close, data_open, temp_args)
+        portfolio = new_strategy(data_open, data_high, data_low, data_close, temp_args)
         df['stock_num=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
@@ -79,7 +83,7 @@ def watch_stock(data_close, data_open, args, stock_range=range(1, 16, 3)):
     return df
 
 
-def new_watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
+def new_watch_hold_days(data_open, data_high, data_low, data_close, args, hold_range=range(1, 6, 1)):
     """
     固定stock_num和pick_window，观察hold_days
     """
@@ -89,12 +93,12 @@ def new_watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5))
     temp_args = copy.copy(args)
     for i in hold_range:
         temp_args.hold_days = i
-        portfolio = new_strategy(data_close, data_open, temp_args)
+        portfolio = new_strategy(data_open, data_high, data_low, data_close, temp_args)
         df['hold_days=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
 
-def watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
+def watch_hold_days(data_close, data_open, args, hold_range=range(1, 6, 1)):
     """
     固定stock_num和pick_window，观察hold_days
     """
@@ -109,7 +113,7 @@ def watch_hold_days(data_close, data_open, args, hold_range=range(5, 21, 5)):
     return df
 
 
-def new_watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
+def new_watch_pick_window(data_open, data_high, data_low, data_close, args, pick_range=range(1, 4)):
     """
     固定hold_days和stock_num，观察pick_window
     """
@@ -119,7 +123,7 @@ def new_watch_pick_window(data_close, data_open, args, pick_range=range(1, 4)):
     temp_args = copy.copy(args)
     for i in pick_range:
         temp_args.pick_window = i
-        portfolio = new_strategy(data_close, data_open, temp_args)
+        portfolio = new_strategy(data_open, data_high, data_low, data_close, temp_args)
         df['pick_window=' + str(i)] = portfolio.holding.nav.iloc[:, 2]
     return df
 
@@ -196,6 +200,8 @@ class Portfolio:
                       self.trading.sell_price,
                       self.trading.buy_amount,
                       self.trading.sell_amount,
+                      self.trading.buy_result,
+                      self.trading.sell_result,
                       self.holding.cash,
                       self.holding.current_holding,
                       self.holding.amount,
@@ -208,6 +214,8 @@ class Portfolio:
                      'self.trading.sell_price',
                      'self.trading.buy_amount',
                      'self.trading.sell_amount',
+                     'self.trading.buy_result',
+                     'self.trading.sell_result',
                      'self.holding.cash',
                      'self.holding.current_holding',
                      'self.holding.amount',
@@ -227,6 +235,8 @@ class Trading:
         self.sell_price = pd.DataFrame(index=data_close.index)
         self.buy_amount = pd.DataFrame(index=data_close.index, columns=range(args.stock_num))
         self.sell_amount = pd.DataFrame(index=data_close.index, columns=range(args.stock_num))
+        self.buy_result = pd.DataFrame(index=data_close.index)
+        self.sell_result = pd.DataFrame(index=data_close.index)
 
 
 class Holding:
@@ -308,7 +318,7 @@ def get_holding_nav(Portfolio):
     return nav_table
 
 
-def trade_portfolio(Portfolio, args):
+def trade_portfolio(Portfolio, data_high, data_low, args):
     Portfolio.current.cash = float(args.asset)
 
     for i, date in enumerate(Portfolio.trading.buy_name.index):
@@ -342,6 +352,13 @@ def trade_portfolio(Portfolio, args):
         buy_list[1] = Portfolio.trading.buy_price.iloc[i, :].values
         buy_list[2] = get_buy_amount(budget=min(Portfolio.current.cash, args.asset / args.hold_days),
                                      trading_list=buy_list)
+        """考虑到了不能买入的股票"""
+        df = pd.DataFrame(
+            get_price_table(pd.DataFrame(Portfolio.trading.buy_name.iloc[i, :]).transpose(), data_high - data_low))
+        for j in df.columns:
+            if df[j].values == 0:
+                buy_list[2][j] = 0
+
         cash_out = np.nansum(buy_list[1] * buy_list[2])
         if np.isnan(cash_out) == 1:
             pass
@@ -360,13 +377,31 @@ def trade_portfolio(Portfolio, args):
     return Portfolio
 
 
-def new_strategy(data_close, data_open, args):
+def get_trade_result(Portfolio, data_high, data_low):
+    """
+    记录交易是否成功,买
+    """
+
+    df = pd.DataFrame(
+        get_price_table(Portfolio.trading.buy_name, data_high - data_low))
+    Portfolio.trading.buy_result = df[df != 0]
+    """
+    记录交易是否成功,卖
+    """
+    df = pd.DataFrame(
+        get_price_table(Portfolio.trading.sell_name, data_high - data_low))
+    Portfolio.trading.sell_result = df[df != 0]
+    return Portfolio
+
+
+def new_strategy(data_open, data_high, data_low, data_close, args):
     a = Portfolio(data_close, args)
     a.trading.buy_name = get_stocks(data_close, args)
     a.trading.sell_name = a.trading.buy_name.shift(args.hold_days)
     a.trading.buy_price = get_price_table(a.trading.buy_name, data_open)
     a.trading.sell_price = get_price_table(a.trading.sell_name, data_open)
-    a = trade_portfolio(a, args)
+    a = trade_portfolio(a, data_high, data_low, args)
+    a = get_trade_result(a, data_high, data_low)
     a.holding.current_holding = get_current_holding(a, args)
     a.holding.amount = get_holding_amount(a, args)
     a.holding.cost_table = get_price_table(a.holding.current_holding, data_open)
@@ -381,9 +416,9 @@ if __name__ == "__main__":
     程序入口
     """
     parser = argparse.ArgumentParser(description='打板策略')
-    parser.add_argument('-hd', '--hold_days', type=int, default=5)
-    parser.add_argument('-sn', '--stock_num', type=int, default=10)
-    parser.add_argument('-pw', '--pick_window', type=int, default=1)
+    parser.add_argument('-hd', '--hold_days', type=int, default=1)
+    parser.add_argument('-sn', '--stock_num', type=int, default=30)
+    parser.add_argument('-pw', '--pick_window', type=int, default=2)
     parser.add_argument('-a', '--asset', type=int, default=10000000)
     args = parser.parse_args()
     main(args)
